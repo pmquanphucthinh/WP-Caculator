@@ -70,7 +70,6 @@ Key-Length: 3072
 Name-Real: {github_username}
 Name-Email: {github_email}
 Expire-Date: 0
-Creation-Date: 2019-05-27
 Passphrase:  # Bỏ trống mật khẩu
 %commit
 %echo done
@@ -86,21 +85,12 @@ subprocess.run(["gpg", "--batch", "--generate-key", batch_file_path])
 # Xóa file batch sau khi sử dụng
 os.remove(batch_file_path)
 
-# Cấu hình Git
-subprocess.run(["git", "config", "--global", "user.email", github_email])
-subprocess.run(["git", "config", "--global", "user.name", github_username])
-subprocess.run(["git", "config", "--global", "github.user", github_username])
-
 # Lấy key ID của GPG key vừa tạo
 gpg = gnupg.GPG()
 public_keys = gpg.list_keys()
 if public_keys:
     key_id = public_keys[0]['keyid']
-    # Cấu hình user.signingkey
-    subprocess.run(["git", "config", "--global", "user.signingkey", key_id])
-    print("Đã cấu hình user.signingkey thành công.")
-
-    # Sử dụng python-gnupg để xuất key
+    # Xuất public key để thêm vào GitHub
     public_key = gpg.export_keys(key_id)
 
     # Thêm GPG key vào GitHub
@@ -118,6 +108,16 @@ if public_keys:
         print(response.json())
 else:
     print("Không thể tìm thấy GPG key.")
+
+# Cấu hình Git
+subprocess.run(["git", "config", "--global", "user.email", github_email])
+subprocess.run(["git", "config", "--global", "user.name", github_username])
+subprocess.run(["git", "config", "--global", "github.user", github_username])
+subprocess.run(["git", "config", "--global", "user.signingkey", key_id])
+subprocess.run(["git", "config", "--global", "gpg.program", "gpg"])
+subprocess.run(["git", "config", "--global", "commit.gpgSign", "true"])
+subprocess.run(["echo", "allow-loopback-pinentry", ">>", os.path.expanduser("~/.gnupg/gpg-agent.conf")])
+subprocess.run(["gpgconf", "--kill", "gpg-agent"])
 
 # URL API để tạo repository
 repo_url = "https://api.github.com/user/repos"
@@ -149,94 +149,39 @@ def create_commit_date_list(start_date, end_date):
 
     while current_date <= end_date:
         if random.choice([True, False, False, True, False]):  # Xác suất 3/7 cho 3-4 ngày mỗi tuần
-            num_commits = random.randint(1, 3)  # Số lần commit mỗi ngày là từ 1 đến 3
+            num_commits = random.randint(1, 3)
             for _ in range(num_commits):
-                commit_date_list.append({
-                    "date": current_date.strftime('%Y-%m-%dT%H:%M:%S'),
-                    "description": random.choice(descriptions)
-                })
+                commit_date_list.append(current_date)
         current_date += timedelta(days=1)
 
     return commit_date_list
 
-def generate_git_history(repo_name, start_date=None, end_date=None):
-    if not start_date:
-        start_date = datetime.now() - timedelta(days=10)  # Mặc định là 180 ngày trước
-    if not end_date:
-        end_date = datetime.now()
+start_date = datetime.now() - timedelta(days=60)
+end_date = datetime.now()
+commit_dates = create_commit_date_list(start_date, end_date)
 
-    commit_date_list = create_commit_date_list(start_date, end_date)
-    
-    history_folder = "Android"
+# Tạo ngẫu nhiên nội dung commit
+def get_random_string(length):
+    letters = string.ascii_lowercase
+    return ''.join(random.choice(letters) for i in range(length))
 
-    # Tạo thư mục lịch sử git.
-    os.makedirs(history_folder, exist_ok=True)  # Sử dụng exist_ok=True để không gây lỗi nếu thư mục đã tồn tại
-    os.chdir(history_folder)
-    subprocess.run(["git", "init"])
-
-    # Tạo các commit.
-    for idx, commit in enumerate(commit_date_list):
-        print(f"Generating commit {idx + 1}/{len(commit_date_list)}...")
-
-        with open(f"SoftwareUpdate.txt", "w", encoding="utf-8") as f:
-            f.write(commit["description"])
-        
-        subprocess.run(["git", "add", "."])
-        commit_command = f'git commit -S --date="{commit["date"]}" -m "{commit["description"]}"'
-        subprocess.run(commit_command, shell=True)
-
-    print(f"Success! {len(commit_date_list)} commits have been created.")
-
-    # Đẩy lên repository GitHub.
-    remote_add_command = f"git remote add origin https://github.com/{github_username}/{repo_name}.git"
-    subprocess.run(remote_add_command, shell=True)
-    subprocess.run(["git", "push", "-u", "origin", "master"])
-
-generate_git_history(repo_names[1])
-
-
-def create_issue(token, repo, title, body):
-    url = f"https://api.github.com/repos/{repo}/issues"
-    headers = {
-        "Authorization": f"token {token}",
-        "Accept": "application/vnd.github.v3+json"
-    }
-    data = {
-        "title": title,
-        "body": body
-    }
-    response = requests.post(url, headers=headers, json=data)
-    if response.status_code == 201:
-        print(f"Issue '{title}' created successfully.")
-        return response.json()["number"]
-    else:
-        print(f"Failed to create issue '{title}'. Status code: {response.status_code}")
-        print("Response:", response.text)
-        return None
-
-def close_issue(token, repo, issue_number):
-    url = f"https://api.github.com/repos/{repo}/issues/{issue_number}"
-    headers = {
-        "Authorization": f"token {token}",
-        "Accept": "application/vnd.github.v3+json"
-    }
-    data = {
-        "state": "closed"
-    }
-    response = requests.patch(url, headers=headers, json=data)
-    if response.status_code == 200:
-        print(f"Issue #{issue_number} closed successfully.")
-    else:
-        print(f"Failed to close issue #{issue_number}. Status code: {response.status_code}")
-        print("Response:", response.text)
-
-# Tạo và đóng issue cho từng repository
+# Tạo commit trong từng repository
 for repo_name in repo_names:
-    repo_full_name = f"{github_username}/{repo_name}"
-    issue_number = create_issue(github_token, repo_full_name, "Sample Issue", "This is a sample issue created by the script.")
-    if issue_number:
-        close_issue(github_token, repo_full_name, issue_number)
+    repo_path = os.path.join(os.getcwd(), repo_name)
+    os.makedirs(repo_path, exist_ok=True)
+    subprocess.run(["git", "init"], cwd=repo_path)
 
-# Dọn dẹp thư mục sau khi hoàn thành
-os.chdir("..")
-shutil.rmtree(history_folder)
+    for commit_date in commit_dates:
+        for description in descriptions:
+            file_name = f"{get_random_string(10)}.txt"
+            file_path = os.path.join(repo_path, file_name)
+            with open(file_path, "w") as f:
+                f.write(description)
+            subprocess.run(["git", "add", file_name], cwd=repo_path)
+            commit_message = f"Add file {file_name}"
+            env = os.environ.copy()
+            env['GIT_COMMITTER_DATE'] = commit_date.isoformat()
+            env['GIT_AUTHOR_DATE'] = commit_date.isoformat()
+            subprocess.run(["git", "commit", "-m", commit_message, "--gpg-sign"], cwd=repo_path, env=env)
+
+print("Quá trình tạo lịch sử commit hoàn tất.")
