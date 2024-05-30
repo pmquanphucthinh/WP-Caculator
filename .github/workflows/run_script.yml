@@ -1,31 +1,33 @@
-name: Run Python Script
+# .github/workflows/main.yml
+name: Python Script Workflow
 
-on:
-  workflow_dispatch:
-    inputs:
-      GITHUB_TOKEN:
-        description: 'GitHub Token'
-        required: true
+on: [push]
 
 jobs:
-  run-python:
+  run-python-script:
     runs-on: ubuntu-latest
-
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@v2
 
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v2
       with:
-        python-version: '3.x'
+        python-version: 3.x
 
     - name: Install dependencies
       run: |
-        python -m pip install requests python-gnupg
+        python -m pip install --upgrade pip
+        pip install requests gnupg python-git
+
+    - name: Input GitHub PAT
+      run: |
+        echo "::set-env name=INPUT_GITHUB_TOKEN::$(echo ${{ secrets.GITHUB_TOKEN }})"
+        echo "Enter GitHub Personal Access Token: "
+        read -s INPUT_GITHUB_TOKEN
+        echo "::set-env name=INPUT_GITHUB_TOKEN::$INPUT_GITHUB_TOKEN"
 
     - name: Run Python script
       env:
-        GITHUB_TOKEN: ${{ github.event.inputs.GITHUB_TOKEN }}
-      run: |
-        python script.py
+        INPUT_GITHUB_TOKEN: ${{ env.INPUT_GITHUB_TOKEN }}
+      run: python main.py
