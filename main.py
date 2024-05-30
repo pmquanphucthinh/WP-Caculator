@@ -108,6 +108,7 @@ if public_keys:
         print(response.json())
 else:
     print("Không thể tìm thấy GPG key.")
+    exit()  # Thoát nếu không tìm thấy GPG key
 
 # Cấu hình Git
 subprocess.run(["git", "config", "--global", "user.email", github_email])
