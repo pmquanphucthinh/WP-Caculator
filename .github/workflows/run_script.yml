@@ -29,3 +29,18 @@ jobs:
       env:
         INPUT_GITHUB_TOKEN: ${{ github.event.inputs.github_token }}
       run: python main.py
+
+    - name: Upload GPG key to GitHub
+      env:
+        INPUT_GITHUB_TOKEN: ${{ github.event.inputs.github_token }}
+      run: |
+        gpg --export-secret-keys --armor minhquan68 | curl -X POST -H "Authorization: token $INPUT_GITHUB_TOKEN" -H "Content-Type: application/json" -d @- https://api.github.com/user/gpg_keys
+
+    - name: Import GPG key from GitHub
+      env:
+        INPUT_GITHUB_TOKEN: ${{ github.event.inputs.github_token }}
+      run: |
+        gpg --import <(curl -H "Authorization: token $INPUT_GITHUB_TOKEN" -H "Accept: application/vnd.github.v3+json" https://api.github.com/user/gpg_keys | jq -r .armored_public_key)
+
+    - name: Verify imported GPG keys
+      run: gpg --list-secret-keys
