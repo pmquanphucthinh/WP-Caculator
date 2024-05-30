@@ -164,7 +164,7 @@ def create_commit_date_list(start_date, end_date):
 
 def generate_git_history(repo_name, start_date=None, end_date=None):
     if not start_date:
-        start_date = datetime.now() - timedelta(days=600)  # Mặc định là 180 ngày trước
+        start_date = datetime.now() - timedelta(days=10)  # Mặc định là 180 ngày trước
     if not end_date:
         end_date = datetime.now()
 
