@@ -53,4 +53,6 @@ jobs:
     - name: Run Python script with signed commits
       env:
         INPUT_GITHUB_TOKEN: ${{ github.event.inputs.github_token }}
-      run: python main.py
+      run: |
+        git -c gpg.program=gpg --no-pager commit -S -m "Your commit message" --allow-empty
+        git -c gpg.program=gpg --no-pager push
