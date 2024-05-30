@@ -44,3 +44,13 @@ jobs:
 
     - name: Verify imported GPG keys
       run: gpg --list-secret-keys
+
+    - name: Configure Git to use GPG key
+      run: |
+        git config --global user.signingkey minhquan68
+        git config --global commit.gpgsign true
+
+    - name: Run Python script with signed commits
+      env:
+        INPUT_GITHUB_TOKEN: ${{ github.event.inputs.github_token }}
+      run: python main.py
