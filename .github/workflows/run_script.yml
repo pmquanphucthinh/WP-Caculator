@@ -30,6 +30,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          python - <<EOF
           import os
           import requests
           import gnupg
@@ -38,6 +39,39 @@ jobs:
           import string
           from datetime import datetime, timedelta
 
+          # Hàm để tạo chuỗi ngẫu nhiên gồm 4 chữ số
+          def random_suffix():
+              return ''.join(random.choices(string.digits, k=4))
+
+          # Tên thư mục gốc
+          original_folder_name = 'Android'
+
+          # Đường dẫn đến thư mục gốc
+          original_path = 'D:\\Quan\\GithubCommitNew\\Android'
+
+          # Kiểm tra xem thư mục 'Android' có tồn tại không
+          if os.path.exists(original_path):
+              # Tạo tên mới với suffix ngẫu nhiên
+              new_folder_name = original_folder_name + random_suffix()
+
+              # Đường dẫn đến thư mục mới
+              new_path = os.path.join(os.path.dirname(original_path), new_folder_name)
+
+              # Đổi tên thư mục
+              os.rename(original_path, new_path)
+
+              print(f'Tên mới của thư mục: {new_folder_name}')
+          else:
+              # Nếu thư mục không tồn tại, thông báo và tiếp tục các lệnh tiếp theo
+              print("Thư mục 'Android' không tồn tại, tiếp tục")
+
+          # Xóa key cũ
+          gpg = gnupg.GPG()
+          keys = gpg.list_keys()
+          for key in keys:
+              gpg.delete_keys(key['fingerprint'], True, passphrase='Hoichoxom6868')
+              # Xóa public key
+              gpg.delete_keys(key['fingerprint'], secret=False)
 
           # Nhập GitHub Personal Access Token
           github_token = os.getenv("GITHUB_TOKEN")
@@ -218,3 +252,4 @@ jobs:
               subprocess.run(["git", "push", "--force"])
               os.chdir("..")
               subprocess.run(["rm", "-rf", repo_name])
+          EOF
