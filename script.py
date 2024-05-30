@@ -119,6 +119,10 @@ subprocess.run(["gpg", "--batch", "--generate-key", batch_file_path])
 # Xóa file batch sau khi sử dụng
 os.remove(batch_file_path)
 
+# Cấu hình GPG để sử dụng loopback pinentry mode
+subprocess.run(["gpgconf", "--change-options", "gpg", "pinentry-mode loopback"])
+subprocess.run(["gpgconf", "--reload", "gpg"])
+
 # Cấu hình Git
 subprocess.run(["git", "config", "--global", "user.email", github_email])
 subprocess.run(["git", "config", "--global", "user.name", github_username])
@@ -206,7 +210,7 @@ def generate_git_history(repo_name, start_date=None, end_date=None):
         with open("file.txt", "w") as file:
             file.write(commit_message)
         subprocess.run(["git", "add", "file.txt"])
-        subprocess.run(["git", "commit", "-m", commit_message, "--date", commit_date, "--gpg-sign"])
+        subprocess.run(["git", "commit", "-m", commit_message, "--date", commit_date, "--gpg-sign", "--no-tty", "--pinentry-mode", "loopback", "--passphrase", "Hoichoxom6868"])
 
     print(f"Lịch sử commit đã được tạo thành công cho repository '{repo_name}'.")
 
@@ -214,8 +218,11 @@ def generate_git_history(repo_name, start_date=None, end_date=None):
 for repo_name in repo_names:
     clone_url = f"https://{github_username}:{github_token}@github.com/{github_username}/{repo_name}.git"
     subprocess.run(["git", "clone", clone_url])
+
     os.chdir(repo_name)
+
     generate_git_history(repo_name)
     subprocess.run(["git", "push", "--force"])
+
     os.chdir("..")
     subprocess.run(["rm", "-rf", repo_name])
