@@ -1,3 +1,4 @@
+# main.py
 import os
 import requests
 import gnupg
@@ -5,43 +6,12 @@ import subprocess
 import random
 import string
 from datetime import datetime, timedelta
-
-# Hàm để tạo chuỗi ngẫu nhiên gồm 4 chữ số
-def random_suffix():
-    return ''.join(random.choices(string.digits, k=4))
-
-# Tên thư mục gốc
-original_folder_name = 'Android'
-
-# Đường dẫn đến thư mục gốc
-original_path = 'D:\\Quan\\GithubCommitNew\\Android'
-
-# Kiểm tra xem thư mục 'Android' có tồn tại không
-if os.path.exists(original_path):
-    # Tạo tên mới với suffix ngẫu nhiên
-    new_folder_name = original_folder_name + random_suffix()
-
-    # Đường dẫn đến thư mục mới
-    new_path = os.path.join(os.path.dirname(original_path), new_folder_name)
-
-    # Đổi tên thư mục
-    os.rename(original_path, new_path)
-
-    print(f'Tên mới của thư mục: {new_folder_name}')
-else:
-    # Nếu thư mục không tồn tại, thông báo và tiếp tục các lệnh tiếp theo
-    print("Thư mục 'Android' không tồn tại, tiếp tục")
-
-# Xóa key cũ
-gpg = gnupg.GPG()
-keys = gpg.list_keys()
-for key in keys:
-    gpg.delete_keys(key['fingerprint'], True, passphrase='Hoichoxom6868')
-    # Xóa public key
-    gpg.delete_keys(key['fingerprint'], secret=False)
+import shutil
+from github import Github
 
 # Nhập GitHub Personal Access Token
-github_token = os.getenv("GITHUB_TOKEN")
+github_token = os.getenv("INPUT_GITHUB_TOKEN")
+gpg_passphrase = "minhquan68"
 
 # Lấy thông tin người dùng từ GitHub API
 user_url = "https://api.github.com/user"
@@ -104,7 +74,7 @@ Name-Real: {github_username}
 Name-Email: {github_email}
 Expire-Date: 0
 Creation-Date: 2019-05-27
-Passphrase: Hoichoxom6868
+Passphrase: {gpg_passphrase}
 %commit
 %echo done
 """
@@ -118,10 +88,6 @@ subprocess.run(["gpg", "--batch", "--generate-key", batch_file_path])
 
 # Xóa file batch sau khi sử dụng
 os.remove(batch_file_path)
-
-# Cấu hình GPG để sử dụng loopback pinentry mode
-subprocess.run(["gpgconf", "--change-options", "gpg", "pinentry-mode loopback"])
-subprocess.run(["gpgconf", "--reload", "gpg"])
 
 # Cấu hình Git
 subprocess.run(["git", "config", "--global", "user.email", github_email])
@@ -200,29 +166,80 @@ def generate_git_history(repo_name, start_date=None, end_date=None):
     if not start_date:
         start_date = datetime.now() - timedelta(days=600)  # Mặc định là 180 ngày trước
     if not end_date:
-        end_date = datetime.now()  # Mặc định là ngày hiện tại
+        end_date = datetime.now()
 
-    commit_dates = create_commit_date_list(start_date, end_date)
+    commit_date_list = create_commit_date_list(start_date, end_date)
+    
+    history_folder = "Android"
 
-    for commit in commit_dates:
-        commit_message = commit["description"]
-        commit_date = commit["date"]
-        with open("file.txt", "w") as file:
-            file.write(commit_message)
-        subprocess.run(["git", "add", "file.txt"])
-        subprocess.run(["git", "commit", "-m", commit_message, "--date", commit_date, "--gpg-sign", "--no-tty", "--pinentry-mode", "loopback", "--passphrase", "Hoichoxom6868"])
+    # Tạo thư mục lịch sử git.
+    os.makedirs(history_folder, exist_ok=True)  # Sử dụng exist_ok=True để không gây lỗi nếu thư mục đã tồn tại
+    os.chdir(history_folder)
+    subprocess.run(["git", "init"])
 
-    print(f"Lịch sử commit đã được tạo thành công cho repository '{repo_name}'.")
+    # Tạo các commit.
+    for idx, commit in enumerate(commit_date_list):
+        print(f"Generating commit {idx + 1}/{len(commit_date_list)}...")
 
-# Clone từng repository và tạo lịch sử commit
+        with open(f"SoftwareUpdate.txt", "w", encoding="utf-8") as f:
+            f.write(commit["description"])
+        
+        subprocess.run(["git", "add", "."])
+        commit_command = f'git commit -S --date="{commit["date"]}" -m "{commit["description"]}"'
+        subprocess.run(commit_command, shell=True)
+
+    print(f"Success! {len(commit_date_list)} commits have been created.")
+
+    # Đẩy lên repository GitHub.
+    remote_add_command = f"git remote add origin https://github.com/{github_username}/{repo_name}.git"
+    subprocess.run(remote_add_command, shell=True)
+    subprocess.run(["git", "push", "-u", "origin", "master"])
+
+generate_git_history(repo_names[1])
+
+
+def create_issue(token, repo, title, body):
+    url = f"https://api.github.com/repos/{repo}/issues"
+    headers = {
+        "Authorization": f"token {token}",
+        "Accept": "application/vnd.github.v3+json"
+    }
+    data = {
+        "title": title,
+        "body": body
+    }
+    response = requests.post(url, headers=headers, json=data)
+    if response.status_code == 201:
+        print(f"Issue '{title}' created successfully.")
+        return response.json()["number"]
+    else:
+        print(f"Failed to create issue '{title}'. Status code: {response.status_code}")
+        print("Response:", response.text)
+        return None
+
+def close_issue(token, repo, issue_number):
+    url = f"https://api.github.com/repos/{repo}/issues/{issue_number}"
+    headers = {
+        "Authorization": f"token {token}",
+        "Accept": "application/vnd.github.v3+json"
+    }
+    data = {
+        "state": "closed"
+    }
+    response = requests.patch(url, headers=headers, json=data)
+    if response.status_code == 200:
+        print(f"Issue #{issue_number} closed successfully.")
+    else:
+        print(f"Failed to close issue #{issue_number}. Status code: {response.status_code}")
+        print("Response:", response.text)
+
+# Tạo và đóng issue cho từng repository
 for repo_name in repo_names:
-    clone_url = f"https://{github_username}:{github_token}@github.com/{github_username}/{repo_name}.git"
-    subprocess.run(["git", "clone", clone_url])
+    repo_full_name = f"{github_username}/{repo_name}"
+    issue_number = create_issue(github_token, repo_full_name, "Sample Issue", "This is a sample issue created by the script.")
+    if issue_number:
+        close_issue(github_token, repo_full_name, issue_number)
 
-    os.chdir(repo_name)
-
-    generate_git_history(repo_name)
-    subprocess.run(["git", "push", "--force"])
-
-    os.chdir("..")
-    subprocess.run(["rm", "-rf", repo_name])
+# Dọn dẹp thư mục sau khi hoàn thành
+os.chdir("..")
+shutil.rmtree(history_folder)
