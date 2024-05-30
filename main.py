@@ -1,4 +1,3 @@
-# main.py
 import os
 import requests
 import gnupg
@@ -7,11 +6,9 @@ import random
 import string
 from datetime import datetime, timedelta
 import shutil
-from github import Github
 
-# Nhập GitHub Personal Access Token
-github_token = os.getenv("INPUT_GITHUB_TOKEN")
-gpg_passphrase = "minhquan68"
+# Nhập GitHub Personal Access Token từ input
+github_token = os.getenv('INPUT_GITHUB_TOKEN')
 
 # Lấy thông tin người dùng từ GitHub API
 user_url = "https://api.github.com/user"
@@ -74,7 +71,7 @@ Name-Real: {github_username}
 Name-Email: {github_email}
 Expire-Date: 0
 Creation-Date: 2019-05-27
-Passphrase: {gpg_passphrase}
+Passphrase:  # Bỏ trống mật khẩu
 %commit
 %echo done
 """
