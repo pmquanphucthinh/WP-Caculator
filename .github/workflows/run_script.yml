@@ -1,7 +1,12 @@
 # .github/workflows/main.yml
 name: Python Script Workflow
 
-on: [push]
+on:
+  workflow_dispatch:
+    inputs:
+      github_token:
+        description: 'GitHub Personal Access Token'
+        required: true
 
 jobs:
   run-python-script:
@@ -20,14 +25,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install requests gnupg python-git
 
-    - name: Input GitHub PAT
-      run: |
-        echo "::set-env name=INPUT_GITHUB_TOKEN::$(echo ${{ secrets.GITHUB_TOKEN }})"
-        echo "Enter GitHub Personal Access Token: "
-        read -s INPUT_GITHUB_TOKEN
-        echo "::set-env name=INPUT_GITHUB_TOKEN::$INPUT_GITHUB_TOKEN"
-
     - name: Run Python script
       env:
-        INPUT_GITHUB_TOKEN: ${{ env.INPUT_GITHUB_TOKEN }}
+        INPUT_GITHUB_TOKEN: ${{ github.event.inputs.github_token }}
       run: python main.py
